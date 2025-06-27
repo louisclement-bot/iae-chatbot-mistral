@@ -6,6 +6,7 @@
  * a clean interface for interacting with agents.
  */
 
+import fetchWithRetry from '@utils/fetchWithRetry';
 import { Agent, AgentConfig, Result, FetchWithRetryOptions } from '@types/index';
 
 /**
@@ -57,6 +58,41 @@ export class AgentService {
   }
 
   /**
+   * Get standard headers for API requests
+   * 
+   * @returns Headers object with Authorization and Content-Type
+   */
+  private getHeaders(): HeadersInit {
+    return {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'iae-chatbot/1.0 (+https://iae.univ-lyon3.fr)'
+    };
+  }
+
+  /**
+   * Format agent configuration for API request
+   * 
+   * @param config - Agent configuration
+   * @returns Formatted agent configuration for API request
+   */
+  private formatAgentConfig(config: AgentConfig): Record<string, any> {
+    return {
+      model: config.model,
+      name: config.name,
+      description: config.description,
+      instructions: config.instructions,
+      tools: config.tools,
+      handoffs: config.handoffs || [],
+      completion_args: {
+        temperature: config.temperature || 0.3,
+        top_p: config.top_p || 0.95
+      }
+    };
+  }
+
+  /**
    * Create a new agent
    * 
    * @param config - Agent configuration
@@ -67,12 +103,15 @@ export class AgentService {
     config: AgentConfig,
     options?: CreateAgentOptions
   ): Promise<Result<Agent, Error>> {
-    // TODO: Phase 2 - Implement agent creation using fetchWithRetry
-    // This will call POST /agents with the agent configuration
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents`;
+    const formattedConfig = this.formatAgentConfig(config);
+
+    return await fetchWithRetry<Agent>(url, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(formattedConfig),
+      ...options?.fetchOptions
+    });
   }
 
   /**
@@ -88,12 +127,20 @@ export class AgentService {
     config: Partial<AgentConfig>,
     options?: UpdateAgentOptions
   ): Promise<Result<Agent, Error>> {
-    // TODO: Phase 2 - Implement agent update using fetchWithRetry
-    // This will call PATCH /agents/{agentId} with the updated configuration
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/${agentId}`;
+    
+    // If replace is true, format the entire config
+    // Otherwise, just send the fields that are provided
+    const body = options?.replace 
+      ? this.formatAgentConfig(config as AgentConfig)
+      : config;
+
+    return await fetchWithRetry<Agent>(url, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+      ...options?.fetchOptions
+    });
   }
 
   /**
@@ -107,12 +154,13 @@ export class AgentService {
     agentId: string,
     options?: CreateAgentOptions
   ): Promise<Result<Agent, Error>> {
-    // TODO: Phase 2 - Implement agent retrieval using fetchWithRetry
-    // This will call GET /agents/{agentId}
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/${agentId}`;
+
+    return await fetchWithRetry<Agent>(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      ...options?.fetchOptions
+    });
   }
 
   /**
@@ -124,12 +172,20 @@ export class AgentService {
   async listAgents(
     options?: ListAgentsOptions
   ): Promise<Result<Agent[], Error>> {
-    // TODO: Phase 2 - Implement agent listing using fetchWithRetry
-    // This will call GET /agents with optional query parameters
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    // Build query parameters
+    const queryParams = new URLSearchParams();
+    if (options?.limit) queryParams.append('limit', options.limit.toString());
+    if (options?.offset) queryParams.append('offset', options.offset.toString());
+    if (options?.name) queryParams.append('name', options.name);
+    
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents${queryString}`;
+
+    return await fetchWithRetry<Agent[]>(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      ...options?.fetchOptions
+    });
   }
 
   /**
@@ -143,12 +199,13 @@ export class AgentService {
     agentId: string,
     options?: CreateAgentOptions
   ): Promise<Result<void, Error>> {
-    // TODO: Phase 2 - Implement agent deletion using fetchWithRetry
-    // This will call DELETE /agents/{agentId}
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/${agentId}`;
+
+    return await fetchWithRetry<void>(url, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      ...options?.fetchOptions
+    });
   }
 
   /**
@@ -164,12 +221,14 @@ export class AgentService {
     targetAgentIds: string[],
     options?: UpdateAgentOptions
   ): Promise<Result<Agent, Error>> {
-    // TODO: Phase 2 - Implement handoff configuration
-    // This will call PATCH /agents/{sourceAgentId} with handoffs array
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/${sourceAgentId}`;
+
+    return await fetchWithRetry<Agent>(url, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ handoffs: targetAgentIds }),
+      ...options?.fetchOptions
+    });
   }
 
   /**
@@ -183,12 +242,18 @@ export class AgentService {
     agentId: string,
     options?: CreateAgentOptions
   ): Promise<Result<boolean, Error>> {
-    // TODO: Phase 2 - Implement agent existence check
-    // This will call GET /agents/{agentId} and handle 404 errors
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    const result = await this.getAgent(agentId, options);
+    
+    if (result.success) {
+      return { success: true, data: true };
+    } else {
+      // If it's a 404 error, the agent doesn't exist
+      if (result.error.message.includes('404')) {
+        return { success: true, data: false };
+      }
+      // For other errors, propagate the error
+      return { success: false, error: result.error };
+    }
   }
 
   /**
@@ -202,12 +267,53 @@ export class AgentService {
     configs: Record<string, AgentConfig>,
     options?: CreateAgentOptions
   ): Promise<Result<Record<string, Agent>, Error>> {
-    // TODO: Phase 2 - Implement batch agent creation
-    // This will call createAgent for each agent type
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    try {
+      // Create all agents in parallel
+      const agentPromises = Object.entries(configs).map(async ([type, config]) => {
+        const result = await this.createAgent(config, options);
+        if (!result.success) {
+          throw new Error(`Failed to create agent ${type}: ${result.error.message}`);
+        }
+        return [type, result.data];
+      });
+
+      // Wait for all agents to be created
+      const agentEntries = await Promise.all(agentPromises);
+      
+      // Convert entries to record
+      const agents = Object.fromEntries(agentEntries) as Record<string, Agent>;
+      
+      return { success: true, data: agents };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error))
+      };
+    }
+  }
+
+  /**
+   * Test API connectivity
+   * 
+   * @param options - Options for testing connectivity
+   * @returns Result indicating success or an error
+   */
+  async testConnectivity(
+    options?: CreateAgentOptions
+  ): Promise<Result<boolean, Error>> {
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/models`;
+
+    const result = await fetchWithRetry<any>(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      ...options?.fetchOptions
+    });
+
+    if (result.success) {
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: result.error };
+    }
   }
 }
 

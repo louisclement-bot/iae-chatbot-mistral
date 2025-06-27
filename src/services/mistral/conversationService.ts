@@ -6,6 +6,7 @@
  * and provides a clean interface for managing conversations.
  */
 
+import fetchWithRetry from '@utils/fetchWithRetry';
 import {
   ConversationStartRequest,
   ConversationAppendRequest,
@@ -14,7 +15,8 @@ import {
   Result,
   FetchWithRetryOptions,
   StreamEvent,
-  StreamEventType
+  StreamEventType,
+  MessageSource
 } from '@types/index';
 
 /**
@@ -75,6 +77,68 @@ export class ConversationService {
   }
 
   /**
+   * Get standard headers for API requests
+   * 
+   * @returns Headers object with Authorization and Content-Type
+   */
+  private getHeaders(): HeadersInit {
+    return {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'iae-chatbot/1.0 (+https://iae.univ-lyon3.fr)'
+    };
+  }
+
+  /**
+   * Parse the response from the agent completion API
+   * 
+   * @param data - Raw API response
+   * @returns Processed response with content, sources, and PDF detection
+   */
+  private parseAgentResponse(data: any): {
+    content: string;
+    sources: MessageSource[];
+    hasPdfUrls: boolean;
+    rawApiResponse: any;
+  } {
+    // Extract message content
+    const message = data.choices?.[0]?.message;
+    if (!message) {
+      throw new Error('Invalid response format: missing message content');
+    }
+
+    let content = message.content || '';
+    const sources: MessageSource[] = [];
+    let hasPdfUrls = false;
+
+    // Detect PDF URLs in content
+    if (content.includes('.pdf')) {
+      hasPdfUrls = true;
+    }
+
+    // Process tool calls if they exist
+    if (message.tool_calls) {
+      message.tool_calls.forEach((toolCall: any) => {
+        if (toolCall.function) {
+          sources.push({
+            title: toolCall.function.name,
+            url: toolCall.function.arguments || '',
+            source: toolCall.type
+          });
+        }
+      });
+    }
+
+    return {
+      content: content.trim(),
+      sources,
+      hasPdfUrls,
+      rawApiResponse: data
+    };
+  }
+
+  /**
    * Start a new conversation with an agent
    * 
    * @param request - Conversation start request
@@ -85,12 +149,55 @@ export class ConversationService {
     request: ConversationStartRequest,
     options?: StartConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // TODO: Phase 2 - Implement conversation start using fetchWithRetry
-    // This will call POST /v1/conversations with the start request
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    try {
+      // In the current implementation, we're using /agents/completions
+      // This will be migrated to /conversations in Phase 3
+      const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/completions`;
+      
+      const payload = {
+        agent_id: request.agentId,
+        messages: [
+          {
+            role: 'user',
+            content: request.inputs
+          }
+        ]
+      };
+      
+      const result = await fetchWithRetry<any>(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload),
+        ...options?.fetchOptions
+      });
+      
+      if (!result.success) {
+        return result;
+      }
+      
+      const { content, sources, hasPdfUrls, rawApiResponse } = this.parseAgentResponse(result.data);
+      
+      // Format the response to match our AgentCompletionResponse type
+      const response: AgentCompletionResponse = {
+        id: rawApiResponse.id,
+        object: 'agent.completion',
+        created_at: new Date(rawApiResponse.created || Date.now()).getTime(),
+        conversation_id: rawApiResponse.id,
+        content,
+        sources,
+        hasPdfUrls,
+        rawApiResponse,
+        stepName: 'Conversation',
+        usage: rawApiResponse.usage || {}
+      };
+      
+      return { success: true, data: response };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error))
+      };
+    }
   }
 
   /**
@@ -104,12 +211,57 @@ export class ConversationService {
     request: ConversationAppendRequest,
     options?: AppendConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // TODO: Phase 2 - Implement conversation append using fetchWithRetry
-    // This will call POST /v1/conversations/{conversation_id} with the append request
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 2')
-    };
+    try {
+      // In the current implementation, we're using /agents/completions
+      // This will be migrated to /conversations/{conversation_id} in Phase 3
+      const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/completions`;
+      
+      // For now, we're just sending the new message as a user message
+      // In the future, we'll send the entire conversation history
+      const payload = {
+        agent_id: request.agentId,
+        messages: [
+          {
+            role: 'user',
+            content: request.inputs
+          }
+        ]
+      };
+      
+      const result = await fetchWithRetry<any>(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload),
+        ...options?.fetchOptions
+      });
+      
+      if (!result.success) {
+        return result;
+      }
+      
+      const { content, sources, hasPdfUrls, rawApiResponse } = this.parseAgentResponse(result.data);
+      
+      // Format the response to match our AgentCompletionResponse type
+      const response: AgentCompletionResponse = {
+        id: rawApiResponse.id,
+        object: 'agent.completion',
+        created_at: new Date(rawApiResponse.created || Date.now()).getTime(),
+        conversation_id: request.conversationId || rawApiResponse.id,
+        content,
+        sources,
+        hasPdfUrls,
+        rawApiResponse,
+        stepName: 'Conversation',
+        usage: rawApiResponse.usage || {}
+      };
+      
+      return { success: true, data: response };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error))
+      };
+    }
   }
 
   /**
@@ -123,11 +275,12 @@ export class ConversationService {
     request: ConversationRestartRequest,
     options?: RestartConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // TODO: Phase 2 - Implement conversation restart using fetchWithRetry
-    // This will call POST /v1/conversations/{conversation_id}/restart with the restart request
+    // In the current implementation with /agents/completions,
+    // there's no concept of restarting a conversation from a specific point.
+    // This will be implemented in Phase 3 with the /conversations API.
     return {
       success: false,
-      error: new Error('Not implemented - Phase 2')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
@@ -248,11 +401,11 @@ export class ConversationService {
     result: any,
     options?: AppendConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // TODO: Phase 2 - Implement function result submission
-    // This will call POST /v1/conversations/{conversation_id} with the function result
+    // Function result submission is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Not implemented - Phase 2')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
@@ -267,11 +420,11 @@ export class ConversationService {
     conversationId: string,
     options?: ConversationBaseOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // TODO: Phase 2 - Implement conversation retrieval
-    // This will call GET /v1/conversations/{conversation_id}
+    // Conversation retrieval is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Not implemented - Phase 2')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
@@ -284,11 +437,11 @@ export class ConversationService {
   async listConversations(
     options?: ConversationBaseOptions & { limit?: number; offset?: number }
   ): Promise<Result<AgentCompletionResponse[], Error>> {
-    // TODO: Phase 2 - Implement conversation listing
-    // This will call GET /v1/conversations with optional query parameters
+    // Conversation listing is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Not implemented - Phase 2')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
@@ -303,11 +456,11 @@ export class ConversationService {
     conversationId: string,
     options?: ConversationBaseOptions
   ): Promise<Result<void, Error>> {
-    // TODO: Phase 2 - Implement conversation deletion
-    // This will call DELETE /v1/conversations/{conversation_id}
+    // Conversation deletion is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Not implemented - Phase 2')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
