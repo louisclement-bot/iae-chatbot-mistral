@@ -1,49 +1,64 @@
-# Getting Started with Create React App
+# Chatbot IAE Lyon 3
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Un assistant intelligent spécialisé pour l'IAE Lyon 3, utilisant l'API Mistral AI avec recherche web ciblée.
 
-## Available Scripts
+## 🚀 Fonctionnalités
 
-In the project directory, you can run:
+- **Intelligence artificielle avancée** : Powered by Mistral AI
+- **Recherche web spécialisée** : Recherche uniquement sur iae.univ-lyon3.fr
+- **Interface moderne** : Design responsive avec Tailwind CSS
+- **Sources vérifiées** : Chaque réponse inclut les liens vers les sources officielles
+- **Temps réel** : Réponses instantanées avec indicateur de chargement
 
-### `npm start`
+## 📋 Prérequis
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- Node.js (v14 ou supérieur)
+- npm ou yarn
+- Clé API Mistral AI
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🛠️ Installation
 
-### `npm test`
+1. **Installer les dépendances**
+   ```bash
+   npm install
+   ```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+2. **Configuration de l'API**
+   ```bash
+   # Copier le fichier d'exemple
+   cp .env.example .env
+   
+   # Éditer .env et ajouter votre clé Mistral AI
+   REACT_APP_MISTRAL_API_KEY=votre_cle_mistral_ici
+   ```
 
-### `npm run build`
+3. **Lancer l'application**
+   ```bash
+   npm start
+   ```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+   L'application sera disponible sur http://localhost:3000
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 🔧 Technologies utilisées
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **React** : Framework frontend
+- **Tailwind CSS** : Framework CSS utilitaire
+- **Lucide React** : Icônes modernes
+- **Mistral AI** : Intelligence artificielle et recherche web
 
-### `npm run eject`
+## 🔐 Sécurité
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+⚠️ **Important** : Pour un environnement de production, il est **fortement recommandé** de créer un backend pour sécuriser la clé API.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 🎯 Utilisation
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+1. **Démarrer une conversation** : Tapez votre question dans le champ de saisie
+2. **Questions suggérées** :
+   - "Quelles sont les formations disponibles ?"
+   - "Comment s'inscrire à l'IAE Lyon 3 ?"
+   - "Informations sur la vie étudiante"
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+**Développé avec ❤️ pour l'IAE Lyon 3**
 
 ### Code Splitting
 
