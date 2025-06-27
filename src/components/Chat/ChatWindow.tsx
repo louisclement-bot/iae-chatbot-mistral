@@ -7,13 +7,16 @@
  * - Send button
  * - Loading indicators
  * - Workflow visualization
- * 
- * Note: This is a placeholder implementation for Phase 1 (TypeScript structure).
- * The actual implementation will be completed in Phase 5 (UI component refactor).
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Message, UserMessage, BotMessage, WorkflowStep } from '@types/index';
+import React, { useRef, useEffect } from 'react';
+import { Loader2, Bot } from 'lucide-react';
+import { Message, WorkflowStep, MessageSource } from '@types/index';
+
+// Import the new components
+import MessageBubble from './MessageBubble';
+import WorkflowIndicator from './WorkflowIndicator';
+import ChatInput from './ChatInput';
 
 /**
  * Props for the ChatWindow component
@@ -37,6 +40,12 @@ export interface ChatWindowProps {
   /** Callback when user sends a message */
   onSendMessage: (message: string) => Promise<void>;
   
+  /** Current value of the input message */
+  inputMessage: string;
+  
+  /** Callback for when the input message changes */
+  onInputChange: (message: string) => void;
+  
   /** Optional class name for styling */
   className?: string;
   
@@ -47,13 +56,14 @@ export interface ChatWindowProps {
   showWorkflow?: boolean;
   
   /** Callback when a source link is clicked */
-  onSourceClick?: (source: { title?: string; url: string; source?: string }) => void;
+  onSourceClick?: (source: MessageSource) => void;
 }
 
 /**
  * ChatWindow component
  * 
  * Displays the chat interface with messages, input field, and workflow visualization.
+ * Uses MessageBubble, WorkflowIndicator, and ChatInput components.
  */
 const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
@@ -62,14 +72,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
   error,
   debugInfo,
   onSendMessage,
+  inputMessage,
+  onInputChange,
   className = '',
   showLogs = true,
   showWorkflow = true,
   onSourceClick
 }) => {
-  // State for user input
-  const [inputMessage, setInputMessage] = useState<string>('');
-  
   // Ref for scrolling to bottom of messages
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -77,77 +86,90 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
    * Scroll to the bottom of the message list
    */
   const scrollToBottom = () => {
-    // TODO: Phase 5 - Implement smooth scrolling to bottom
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   
   /**
    * Effect to scroll to bottom when messages change
    */
   useEffect(() => {
-    // TODO: Phase 5 - Implement scroll effect
+    scrollToBottom();
   }, [messages]);
   
   /**
    * Handle sending a message
    */
   const handleSendMessage = async () => {
-    // TODO: Phase 5 - Implement message sending
+    if (inputMessage.trim()) {
+      await onSendMessage(inputMessage);
+    }
   };
   
-  /**
-   * Handle key press in the input field
-   */
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // TODO: Phase 5 - Implement Enter key handling
-  };
-  
-  /**
-   * Format a timestamp for display
-   */
-  const formatTime = (timestamp: Date): string => {
-    // TODO: Phase 5 - Implement time formatting
-    return timestamp.toLocaleTimeString();
-  };
-  
-  /**
-   * Render a message bubble
-   */
-  const renderMessage = (message: Message) => {
-    // TODO: Phase 5 - Implement message rendering with Markdown support
-    return null;
-  };
-  
-  /**
-   * Render the workflow indicator
-   */
-  const renderWorkflowIndicator = () => {
-    // TODO: Phase 5 - Implement workflow step visualization
-    return null;
-  };
-  
-  /**
-   * Render the API logs panel
-   */
-  const renderApiLogs = () => {
-    // TODO: Phase 5 - Implement API logs panel
-    return null;
-  };
-  
-  // TODO: Phase 5 - Implement the full component UI
   return (
-    <div className={`chat-window ${className}`}>
-      {/* This is a placeholder implementation for Phase 1 */}
-      <div className="messages-container">
-        {/* Messages will be rendered here */}
+    <div className={`bg-white rounded-2xl shadow-xl overflow-hidden ${className}`}>
+      {/* Error message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 m-4 rounded">
+          <p className="font-medium">Erreur</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+      
+      {/* Debug information */}
+      {debugInfo && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 m-4 rounded">
+          <p className="font-medium">Debug Info</p>
+          <pre className="text-xs whitespace-pre-wrap">{debugInfo}</pre>
+        </div>
+      )}
+      
+      {/* Messages container */}
+      <div className="h-[600px] overflow-y-auto p-6 space-y-6">
+        {/* Map through messages and render MessageBubble for each */}
+        {messages.map((message) => (
+          <MessageBubble 
+            key={message.id} 
+            message={message} 
+          />
+        ))}
+        
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="flex items-start space-x-3 max-w-4xl">
+              <div className="p-2 rounded-full bg-gray-100">
+                <Bot className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="p-4 rounded-2xl bg-gray-50">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <span className="text-sm text-gray-600">
+                      Exécution du workflow agentic...
+                    </span>
+                  </div>
+                  
+                  {/* Workflow indicator */}
+                  {showWorkflow && (
+                    <WorkflowIndicator workflowSteps={workflowSteps} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Reference for scrolling to bottom */}
+        <div ref={messagesEndRef} />
       </div>
       
-      {/* Input area will be implemented in Phase 5 */}
-      <div className="input-container">
-        {/* Input field and send button */}
-      </div>
-      
-      {/* Reference for scrolling to bottom */}
-      <div ref={messagesEndRef} />
+      {/* Input area using ChatInput component */}
+      <ChatInput
+        inputMessage={inputMessage}
+        onInputChange={onInputChange}
+        onSendMessage={handleSendMessage}
+        isLoading={isLoading}
+      />
     </div>
   );
 };
