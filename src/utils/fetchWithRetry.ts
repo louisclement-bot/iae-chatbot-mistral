@@ -6,7 +6,7 @@
  * API calls with resilience.
  */
 
-import { FetchWithRetryOptions, Result } from '@types/index';
+import { FetchWithRetryOptions, Result } from '@types';
 
 /**
  * Error types for fetch operations

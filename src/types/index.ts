@@ -199,6 +199,13 @@ export interface AgentCompletionResponse {
   choices: ApiResponseChoice[];
   usage: ApiUsage;
   outputs?: ApiOutput[];
+  // Additional properties used in our application logic
+  content: string;
+  sources: MessageSource[];
+  hasPdfUrls: boolean;
+  workflowPath?: string[];
+  stepName?: string;
+  rawApiResponse?: any;
 }
 
 /**
@@ -267,6 +274,8 @@ export type ApiOutput = ToolExecutionOutput | MessageOutput;
 export interface ConversationStartRequest {
   agent_id: string;
   inputs: string;
+  agentId?: string; // camelCase version for convenience
+  stepName?: string; // For workflow tracking
 }
 
 /**
@@ -275,6 +284,9 @@ export interface ConversationStartRequest {
 export interface ConversationAppendRequest {
   conversation_id: string;
   inputs: string;
+  conversationId?: string; // camelCase version for convenience
+  agentId?: string; // For specifying agent in append operations
+  stepName?: string; // For workflow tracking
 }
 
 /**
@@ -283,6 +295,9 @@ export interface ConversationAppendRequest {
 export interface ConversationRestartRequest {
   conversation_id: string;
   inputs: string;
+  conversationId?: string; // camelCase version for convenience
+  agentId?: string; // For specifying agent in restart operations
+  stepName?: string; // For workflow tracking
 }
 
 /**

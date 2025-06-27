@@ -17,8 +17,11 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
     "eject": "react-scripts eject",
+    "test": "jest --runInBand",
+    "test:react": "react-scripts test",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
     "cy:baseline": "cypress run --spec 'cypress/e2e/baseline-chatbot.cy.js'",
