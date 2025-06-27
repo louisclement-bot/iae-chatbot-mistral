@@ -12,8 +12,14 @@ module.exports = {
   // Use ts-jest preset for TypeScript support
   preset: 'ts-jest',
   
-  // Test environment for React
+  // Explicitly set the test environment to JSDOM for browser-like testing
   testEnvironment: 'jsdom',
+
+  // Files that need to run **before** the test framework is installed
+  // (polyfills, global mocks, etc.)
+  setupFiles: [
+    '<rootDir>/jest.setup.js'      // ensure global objects are available
+  ],
   
   // File extensions to consider for tests
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],

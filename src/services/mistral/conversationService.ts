@@ -91,6 +91,19 @@ export class ConversationService {
   }
 
   /**
+   * Headers for **SSE** streaming requests.
+   * Docs § 3 & § 5 require `Accept: text/event-stream`.
+   */
+  private getStreamingHeaders(): HeadersInit {
+    return {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+      'User-Agent': 'iae-chatbot/1.0 (+https://iae.univ-lyon3.fr)'
+    };
+  }
+
+  /**
    * Parse the response from the agent completion API
    * 
    * @param data - Raw API response
@@ -150,9 +163,8 @@ export class ConversationService {
     options?: StartConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
     try {
-      // In the current implementation, we're using /agents/completions
-      // This will be migrated to /conversations in Phase 3
-      const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/completions`;
+      // Phase 3: use official conversation endpoint
+      const url = `${options?.apiBaseUrl || this.apiBaseUrl}/conversations`;
       
       const payload = {
         agent_id: request.agentId,
@@ -212,9 +224,8 @@ export class ConversationService {
     options?: AppendConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
     try {
-      // In the current implementation, we're using /agents/completions
-      // This will be migrated to /conversations/{conversation_id} in Phase 3
-      const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/completions`;
+      // Append to conversation with new endpoint
+      const url = `${options?.apiBaseUrl || this.apiBaseUrl}/conversations/${request.conversationId}`;
       
       // For now, we're just sending the new message as a user message
       // In the future, we'll send the entire conversation history
@@ -275,13 +286,20 @@ export class ConversationService {
     request: ConversationRestartRequest,
     options?: RestartConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // In the current implementation with /agents/completions,
-    // there's no concept of restarting a conversation from a specific point.
-    // This will be implemented in Phase 3 with the /conversations API.
-    return {
-      success: false,
-      error: new Error('Not implemented - Phase 3')
+    // Phase 3 – call `/conversations/{id}/restart`
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/conversations/${request.conversationId}/restart`;
+    const payload = {
+      message_id: request.messageId,
+      inputs: request.inputs ?? ''
     };
+
+    const result = await fetchWithRetry<AgentCompletionResponse>(url, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+      ...options?.fetchOptions
+    });
+    return result;
   }
 
   /**
@@ -295,9 +313,31 @@ export class ConversationService {
     request: ConversationStartRequest,
     options?: StartConversationOptions
   ): Promise<AsyncIterable<StreamEvent>> {
-    // TODO: Phase 3 - Implement conversation streaming
-    // This will call POST /v1/conversations with stream=true and handle SSE
-    throw new Error('Not implemented - Phase 3');
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/conversations`;
+    const payload = {
+      agent_id: request.agentId,
+      stream: true,
+      messages: [{ role: 'user', content: request.inputs }]
+    };
+
+    const result = await fetchWithRetry<Response>(url, {
+      method: 'POST',
+      headers: this.getStreamingHeaders(),
+      body: JSON.stringify(payload),
+      // streaming requests use a longer timeout
+      timeout: 60000,
+      ...options?.fetchOptions
+    });
+
+    if (!result.success) {
+      throw result.error;
+    }
+
+    // Parse SSE stream
+    if (!result.data.body) {
+      throw new Error('Stream body missing from response');
+    }
+    return this.parseEventStream(result.data.body);
   }
 
   /**
@@ -311,9 +351,28 @@ export class ConversationService {
     request: ConversationAppendRequest,
     options?: AppendConversationOptions
   ): Promise<AsyncIterable<StreamEvent>> {
-    // TODO: Phase 3 - Implement conversation append streaming
-    // This will call POST /v1/conversations/{conversation_id} with stream=true and handle SSE
-    throw new Error('Not implemented - Phase 3');
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/conversations/${request.conversationId}`;
+    const payload = {
+      stream: true,
+      messages: [{ role: 'user', content: request.inputs }]
+    };
+
+    const result = await fetchWithRetry<Response>(url, {
+      method: 'POST',
+      headers: this.getStreamingHeaders(),
+      body: JSON.stringify(payload),
+      timeout: 60000,
+      ...options?.fetchOptions
+    });
+
+    if (!result.success) {
+      throw result.error;
+    }
+
+    if (!result.data.body) {
+      throw new Error('Stream body missing from response');
+    }
+    return this.parseEventStream(result.data.body);
   }
 
   /**
@@ -327,9 +386,29 @@ export class ConversationService {
     request: ConversationRestartRequest,
     options?: RestartConversationOptions
   ): Promise<AsyncIterable<StreamEvent>> {
-    // TODO: Phase 3 - Implement conversation restart streaming
-    // This will call POST /v1/conversations/{conversation_id}/restart with stream=true and handle SSE
-    throw new Error('Not implemented - Phase 3');
+    const url = `${options?.apiBaseUrl || this.apiBaseUrl}/conversations/${request.conversationId}/restart`;
+    const payload = {
+      message_id: request.messageId,
+      inputs: request.inputs ?? '',
+      stream: true
+    };
+
+    const result = await fetchWithRetry<Response>(url, {
+      method: 'POST',
+      headers: this.getStreamingHeaders(),
+      body: JSON.stringify(payload),
+      timeout: 60000,
+      ...options?.fetchOptions
+    });
+
+    if (!result.success) {
+      throw result.error;
+    }
+
+    if (!result.data.body) {
+      throw new Error('Stream body missing from response');
+    }
+    return this.parseEventStream(result.data.body);
   }
 
   /**
@@ -345,9 +424,10 @@ export class ConversationService {
     onEvent: StreamEventHandler,
     options?: StartConversationOptions
   ): Promise<void> {
-    // TODO: Phase 3 - Implement callback-based streaming
-    // This will use startStream and call onEvent for each event
-    throw new Error('Not implemented - Phase 3');
+    const stream = await this.startStream(request, options);
+    for await (const event of stream) {
+      onEvent(event);
+    }
   }
 
   /**
@@ -363,9 +443,10 @@ export class ConversationService {
     onEvent: StreamEventHandler,
     options?: AppendConversationOptions
   ): Promise<void> {
-    // TODO: Phase 3 - Implement callback-based streaming
-    // This will use appendStream and call onEvent for each event
-    throw new Error('Not implemented - Phase 3');
+    const stream = await this.appendStream(request, options);
+    for await (const event of stream) {
+      onEvent(event);
+    }
   }
 
   /**
@@ -381,9 +462,10 @@ export class ConversationService {
     onEvent: StreamEventHandler,
     options?: RestartConversationOptions
   ): Promise<void> {
-    // TODO: Phase 3 - Implement callback-based streaming
-    // This will use restartStream and call onEvent for each event
-    throw new Error('Not implemented - Phase 3');
+    const stream = await this.restartStream(request, options);
+    for await (const event of stream) {
+      onEvent(event);
+    }
   }
 
   /**
@@ -465,15 +547,104 @@ export class ConversationService {
   }
 
   /**
+   * Map string event type to StreamEventType enum
+   * 
+   * @param eventType - String event type from SSE
+   * @returns Corresponding StreamEventType enum value
+   */
+  private mapEventType(eventType: string): StreamEventType {
+    switch (eventType) {
+      case 'conversation.response.started':
+        return StreamEventType.CONVERSATION_RESPONSE_STARTED;
+      case 'tool.execution.started':
+        return StreamEventType.TOOL_EXECUTION_STARTED;
+      case 'tool.execution.done':
+        return StreamEventType.TOOL_EXECUTION_DONE;
+      case 'agent.handoff.started':
+        return StreamEventType.AGENT_HANDOFF_STARTED;
+      case 'message.output.delta':
+        return StreamEventType.MESSAGE_OUTPUT_DELTA;
+      case 'conversation.response.done':
+        return StreamEventType.CONVERSATION_RESPONSE_DONE;
+      default:
+        return StreamEventType.UNKNOWN;
+    }
+  }
+
+  /**
    * Parse a stream of events from a ReadableStream
    * 
    * @param stream - ReadableStream from fetch response
    * @returns AsyncIterable of StreamEvents
    */
   private async *parseEventStream(stream: ReadableStream<Uint8Array>): AsyncIterable<StreamEvent> {
-    // TODO: Phase 3 - Implement SSE parsing
-    // This will read the stream and parse SSE events into StreamEvents
-    throw new Error('Not implemented - Phase 3');
+    const reader = stream.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        // Decode the chunk and add it to the buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // Split by double newline per SSE spec (using literal newlines)
+        const parts = buffer.split(/\n\n/);
+        
+        // Keep the last part in the buffer as it might be incomplete
+        buffer = parts.pop() || '';
+
+        for (const raw of parts) {
+          if (!raw.trim()) continue; // Skip empty events
+          
+          // Initialize event with Unknown type as default
+          const event: Partial<StreamEvent> = { 
+            type: StreamEventType.UNKNOWN,
+            data: {} 
+          };
+          
+          // Parse the event lines
+          const lines = raw.split(/\n/);
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            try {
+              if (line.startsWith('event:')) {
+                // Map the event type string to enum
+                const eventTypeStr = line.replace('event:', '').trim();
+                event.type = this.mapEventType(eventTypeStr);
+              } else if (line.startsWith('data:')) {
+                // Parse data as JSON if possible
+                const dataStr = line.replace('data:', '').trim();
+                try {
+                  event.data = JSON.parse(dataStr);
+                } catch (e) {
+                  // If JSON parsing fails, use the raw string
+                  event.data = dataStr;
+                }
+              }
+              // Ignore other fields like id: for now
+            } catch (lineError) {
+              console.error('Error parsing SSE line:', lineError, line);
+              // Continue processing other lines even if one fails
+            }
+          }
+          
+          // Only yield valid events
+          if (event.type !== undefined) {
+            yield event as StreamEvent;
+          }
+        }
+      }
+    } catch (streamError) {
+      console.error('Error in SSE stream parsing:', streamError);
+      throw new Error(`Stream parsing error: ${streamError instanceof Error ? streamError.message : String(streamError)}`);
+    } finally {
+      // Always release the reader
+      reader.releaseLock();
+    }
   }
 }
 

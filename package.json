@@ -17,8 +17,11 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
     "eject": "react-scripts eject",
+    "test": "jest --runInBand",
+    "test:react": "react-scripts test",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
     "cy:baseline": "cypress run --spec 'cypress/e2e/baseline-chatbot.cy.js'",
@@ -44,13 +47,24 @@
     ]
   },
   "devDependencies": {
+    "@cypress/webpack-preprocessor": "^5.17.0",
     "@tailwindcss/postcss": "^4.1.11",
     "@tailwindcss/typography": "^0.5.16",
+    "@types/node": "^24.0.4",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
     "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17",
     "cypress": "^13.7.3",
-    "@cypress/webpack-preprocessor": "^5.17.0",
-    "cypress-axe": "^1.6.0"
+    "cypress-axe": "^1.6.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-prettier": "^5.5.1",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^3.4.17",
+    "ts-jest": "^29.4.0",
+    "typescript": "^5.8.3"
   }
 }

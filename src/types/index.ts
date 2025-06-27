@@ -266,14 +266,31 @@ export type ApiOutput = ToolExecutionOutput | MessageOutput;
  */
 export interface ConversationStartRequest {
   agent_id: string;
+  /**
+   * Optional camelCase alias – used by front-end code while
+   * the underscore version is sent to the API payload.
+   */
+  agentId?: string;
   inputs: string;
+  /**
+   * Client-side helper for telemetry / debugging. Not sent to API.
+   */
+  stepName?: string;
 }
 
 /**
  * Conversation append request
  */
 export interface ConversationAppendRequest {
-  conversation_id: string;
+  /** Conversation identifier returned by the first call */
+  conversation_id?: string;
+  /**
+   * Camel-case variant used in TS code – transformed to snake_case
+   * before hitting the API.
+   */
+  conversationId: string;
+  /** Optional agent used for the append (needed for handoffs) */
+  agentId?: string;
   inputs: string;
 }
 
@@ -281,14 +298,23 @@ export interface ConversationAppendRequest {
  * Conversation restart request
  */
 export interface ConversationRestartRequest {
-  conversation_id: string;
-  inputs: string;
+  conversation_id?: string;
+  conversationId: string;
+  /**
+   * Message to branch from (v1/conversations restart semantics)
+   */
+  messageId: string;
+  /** Optional agent performing the restart */
+  agentId?: string;
+  /** Optional new user inputs (can be empty string) */
+  inputs?: string;
 }
 
 /**
  * Streaming event types
  */
 export enum StreamEventType {
+  UNKNOWN = 'unknown',
   CONVERSATION_RESPONSE_STARTED = 'conversation.response.started',
   TOOL_EXECUTION_STARTED = 'tool.execution.started',
   TOOL_EXECUTION_DONE = 'tool.execution.done',
@@ -302,6 +328,11 @@ export enum StreamEventType {
  */
 export interface BaseStreamEvent {
   type: StreamEventType;
+  /**
+   * Raw payload for untyped / future events so the
+   * caller can still inspect content.
+   */
+  data?: any;
 }
 
 /**
