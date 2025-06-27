@@ -18,14 +18,7 @@ export const documentLibraryAgentConfig: AgentConfig = {
   model: "mistral-medium-latest",
   name: "IAE-Docs",
   description: "Recherche dans la base de connaissance IAE",
-  instructions: `Tu es un agent spécialisé pour rechercher dans la base de connaissance de l'IAE Lyon 3.
-
-Instructions :
-1. Utilise TOUJOURS l'outil document_library pour rechercher des informations
-2. Réponds en français de manière professionnelle
-3. Si tu trouves des informations pertinentes, fournis une réponse complète
-4. Si tu ne trouves AUCUNE information pertinente, réponds exactement : "AUCUNE_INFO_TROUVEE"
-5. Spécialise-toi dans : formations, admissions, vie étudiante, recherche, international, stages, carrières`,
+  instructions: "Toujours utiliser document_library. Réponds en FR. Si rien: «AUCUNE_INFO_TROUVEE».",
   tools: [
     {
       type: "document_library",
@@ -49,15 +42,7 @@ export const websearchAgentConfig: AgentConfig = {
   model: "mistral-medium-latest",
   name: "IAE-Websearch",
   description: "Agent spécialisé pour rechercher sur le site iae.univ-lyon3.fr",
-  instructions: `Tu es un agent spécialisé pour rechercher sur le site de l'IAE Lyon 3.
-
-Instructions strictes :
-1. Utilise TOUJOURS web_search avec "site:iae.univ-lyon3.fr" suivi des mots-clés
-2. Recherche UNIQUEMENT sur le domaine iae.univ-lyon3.fr
-3. Réponds en français de manière professionnelle
-4. Si tu trouves des URLs de PDF, mentionne-les clairement dans ta réponse
-5. Cite TOUJOURS tes sources avec les URLs complètes
-6. Si aucun résultat pertinent, réponds : "AUCUN_RESULTAT_WEB"`,
+  instructions: "Query \"site:iae.univ-lyon3.fr {query}\". Cite sources. Si rien: «AUCUN_RESULTAT_WEB».",
   tools: [
     {
       type: "web_search"
@@ -78,14 +63,7 @@ export const docQAAgentConfig: AgentConfig = {
   model: "mistral-medium-latest",
   name: "IAE-DocQnA",
   description: "Agent spécialisé pour analyser les documents PDF de l'IAE Lyon 3",
-  instructions: `Tu es un agent spécialisé pour analyser les documents PDF de l'IAE Lyon 3.
-
-Instructions :
-1. Utilise l'outil document_qna pour analyser le contenu des PDFs
-2. Fournis des réponses détaillées basées sur le contenu des documents
-3. Réponds en français de manière professionnelle
-4. Cite les sections pertinentes des documents
-5. Si le document ne contient pas l'information demandée, indique-le clairement`,
+  instructions: "Analyse les PDFs. Réponds en FR. Cite sections.",
   tools: [
     {
       type: "document_qna"

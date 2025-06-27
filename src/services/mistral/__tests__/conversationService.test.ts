@@ -8,12 +8,38 @@
 
 import ConversationService from '../conversationService';
 import fetchWithRetry from '@utils/fetchWithRetry';
-import { AgentCompletionResponse, ConversationStartRequest, ConversationAppendRequest } from '@types/index';
+import { 
+  AgentCompletionResponse, 
+  ConversationStartRequest, 
+  ConversationAppendRequest, 
+  ConversationRestartRequest,
+  StreamEvent, 
+  StreamEventType 
+} from '@types/index';
 
 // Mock the fetchWithRetry utility
 jest.mock('@utils/fetchWithRetry', () => {
   return jest.fn();
 });
+
+// Helper to create a mock ReadableStream for testing SSE
+const createMockReadableStream = (events: string[]): ReadableStream<Uint8Array> => {
+  let index = 0;
+  return new ReadableStream({
+    start(controller) {
+      function push() {
+        if (index < events.length) {
+          controller.enqueue(new TextEncoder().encode(events[index]));
+          index++;
+          setTimeout(push, 10); // Simulate async chunks
+        } else {
+          controller.close();
+        }
+      }
+      push();
+    }
+  });
+};
 
 describe('ConversationService', () => {
   // Constants for testing
@@ -21,6 +47,7 @@ describe('ConversationService', () => {
   const API_BASE_URL = 'https://test-api.mistral.ai/v1';
   const MOCK_AGENT_ID = 'agent_123456789';
   const MOCK_CONVERSATION_ID = 'conv_123456789';
+  const MOCK_MESSAGE_ID = 'msg_123456789';
   
   // Sample API response for testing
   const mockApiResponse = {
@@ -83,6 +110,18 @@ describe('ConversationService', () => {
       total_tokens: 30
     }
   };
+
+  // Sample SSE events for streaming tests
+  const mockSSEEvents = {
+    conversationStarted: 'event: conversation.response.started\ndata: {"conversation_id": "conv_123456789"}\n\n',
+    toolExecutionStarted: 'event: tool.execution.started\ndata: {"name": "document_library.search", "output_index": 0}\n\n',
+    toolExecutionDone: 'event: tool.execution.done\ndata: {"name": "document_library.search", "output_index": 0}\n\n',
+    agentHandoff: 'event: agent.handoff.started\ndata: {"agent_id": "agent_987654321", "agent_name": "Websearch Agent"}\n\n',
+    messageDelta1: 'event: message.output.delta\ndata: {"content": "This is a "}\n\n',
+    messageDelta2: 'event: message.output.delta\ndata: {"content": "test response"}\n\n',
+    conversationDone: 'event: conversation.response.done\ndata: {"usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30}}\n\n',
+    invalidEvent: 'event: unknown.event\ndata: {"some": "data"}\n\n'
+  };
   
   // Reset mocks before each test
   beforeEach(() => {
@@ -121,7 +160,7 @@ describe('ConversationService', () => {
       
       // Assert
       expect(fetchWithRetry).toHaveBeenCalledWith(
-        `${API_BASE_URL}/agents/completions`,
+        `${API_BASE_URL}/conversations`,
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
@@ -270,7 +309,7 @@ describe('ConversationService', () => {
       
       // Assert
       expect(fetchWithRetry).toHaveBeenCalledWith(
-        `${API_BASE_URL}/agents/completions`,
+        `${API_BASE_URL}/conversations/${MOCK_CONVERSATION_ID}`,
         expect.objectContaining({
           method: 'POST',
           headers: expect.any(Object),
@@ -371,18 +410,16 @@ describe('ConversationService', () => {
   });
   
   describe('restart', () => {
-    it('should call start method with the provided request', async () => {
+    it('should successfully restart a conversation', async () => {
       // Arrange
       const service = new ConversationService(API_KEY, API_BASE_URL);
-      const restartRequest = {
+      const restartRequest: ConversationRestartRequest = {
         conversationId: MOCK_CONVERSATION_ID,
-        messageId: 'msg_123',
-        agentId: MOCK_AGENT_ID,
+        messageId: MOCK_MESSAGE_ID,
         inputs: 'Restart message'
       };
       
-      // Mock the start method to return a successful response
-      jest.spyOn(service, 'start').mockResolvedValueOnce({
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
         success: true,
         data: mockApiResponse
       });
@@ -391,20 +428,51 @@ describe('ConversationService', () => {
       const result = await service.restart(restartRequest);
       
       // Assert
-      expect(service.start).toHaveBeenCalledWith(
+      expect(fetchWithRetry).toHaveBeenCalledWith(
+        `${API_BASE_URL}/conversations/${MOCK_CONVERSATION_ID}/restart`,
         expect.objectContaining({
-          agentId: restartRequest.agentId,
-          inputs: restartRequest.inputs
-        }),
-        undefined // No options passed in this test
+          method: 'POST',
+          headers: expect.any(Object),
+          body: expect.any(String)
+        })
       );
+      
+      // Verify the body contains the correct request payload
+      const calledBody = JSON.parse((fetchWithRetry as jest.Mock).mock.calls[0][1].body);
+      expect(calledBody).toEqual({
+        message_id: MOCK_MESSAGE_ID,
+        inputs: 'Restart message'
+      });
+      
       expect(result.success).toBe(true);
-      expect(result.data).toEqual(mockApiResponse);
+    });
+    
+    it('should handle API errors when restarting a conversation', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const restartRequest: ConversationRestartRequest = {
+        conversationId: MOCK_CONVERSATION_ID,
+        messageId: MOCK_MESSAGE_ID,
+        inputs: 'Restart message'
+      };
+      
+      const mockError = new Error('API error');
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: false,
+        error: mockError
+      });
+      
+      // Act
+      const result = await service.restart(restartRequest);
+      
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(mockError);
     });
   });
   
   describe('streaming methods', () => {
-    it('startStream should throw not implemented error', async () => {
+    it('should successfully start a conversation with streaming', async () => {
       // Arrange
       const service = new ConversationService(API_KEY, API_BASE_URL);
       const request: ConversationStartRequest = {
@@ -412,11 +480,70 @@ describe('ConversationService', () => {
         inputs: 'Test message'
       };
       
-      // Act & Assert
-      await expect(service.startStream(request)).rejects.toThrow('Not implemented - Phase 3');
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.toolExecutionStarted,
+        mockSSEEvents.toolExecutionDone,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.messageDelta2,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Act
+      const stream = await service.startStream(request);
+      const events: StreamEvent[] = [];
+      
+      // Collect all events from the stream
+      for await (const event of stream) {
+        events.push(event);
+      }
+      
+      // Assert
+      expect(fetchWithRetry).toHaveBeenCalledWith(
+        `${API_BASE_URL}/conversations`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Accept': 'text/event-stream'
+          }),
+          body: expect.stringContaining('"stream":true')
+        })
+      );
+      
+      // Verify all events were received
+      expect(events.length).toBe(6);
+      
+      // Check specific event types
+      expect(events[0].type).toBe(StreamEventType.CONVERSATION_RESPONSE_STARTED);
+      expect(events[1].type).toBe(StreamEventType.TOOL_EXECUTION_STARTED);
+      expect(events[2].type).toBe(StreamEventType.TOOL_EXECUTION_DONE);
+      expect(events[3].type).toBe(StreamEventType.MESSAGE_OUTPUT_DELTA);
+      expect(events[4].type).toBe(StreamEventType.MESSAGE_OUTPUT_DELTA);
+      expect(events[5].type).toBe(StreamEventType.CONVERSATION_RESPONSE_DONE);
+      
+      // Check event data
+      expect(events[0].data.conversation_id).toBe(MOCK_CONVERSATION_ID);
+      expect(events[3].data.content).toBe('This is a ');
+      expect(events[4].data.content).toBe('test response');
+      expect(events[5].data.usage).toEqual({
+        prompt_tokens: 10,
+        completion_tokens: 20,
+        total_tokens: 30
+      });
     });
     
-    it('appendStream should throw not implemented error', async () => {
+    it('should successfully append to a conversation with streaming', async () => {
       // Arrange
       const service = new ConversationService(API_KEY, API_BASE_URL);
       const request: ConversationAppendRequest = {
@@ -425,8 +552,379 @@ describe('ConversationService', () => {
         inputs: 'Follow-up message'
       };
       
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.messageDelta2,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Act
+      const stream = await service.appendStream(request);
+      const events: StreamEvent[] = [];
+      
+      // Collect all events from the stream
+      for await (const event of stream) {
+        events.push(event);
+      }
+      
+      // Assert
+      expect(fetchWithRetry).toHaveBeenCalledWith(
+        `${API_BASE_URL}/conversations/${MOCK_CONVERSATION_ID}`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Accept': 'text/event-stream'
+          }),
+          body: expect.stringContaining('"stream":true')
+        })
+      );
+      
+      // Verify all events were received
+      expect(events.length).toBe(4);
+      
+      // Check specific event types
+      expect(events[0].type).toBe(StreamEventType.CONVERSATION_RESPONSE_STARTED);
+      expect(events[1].type).toBe(StreamEventType.MESSAGE_OUTPUT_DELTA);
+      expect(events[2].type).toBe(StreamEventType.MESSAGE_OUTPUT_DELTA);
+      expect(events[3].type).toBe(StreamEventType.CONVERSATION_RESPONSE_DONE);
+    });
+    
+    it('should successfully restart a conversation with streaming', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationRestartRequest = {
+        conversationId: MOCK_CONVERSATION_ID,
+        messageId: MOCK_MESSAGE_ID,
+        inputs: 'Restart message'
+      };
+      
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.messageDelta2,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Act
+      const stream = await service.restartStream(request);
+      const events: StreamEvent[] = [];
+      
+      // Collect all events from the stream
+      for await (const event of stream) {
+        events.push(event);
+      }
+      
+      // Assert
+      expect(fetchWithRetry).toHaveBeenCalledWith(
+        `${API_BASE_URL}/conversations/${MOCK_CONVERSATION_ID}/restart`,
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            'Accept': 'text/event-stream'
+          }),
+          body: expect.stringContaining('"stream":true')
+        })
+      );
+      
+      // Verify all events were received
+      expect(events.length).toBe(4);
+    });
+    
+    it('should handle agent handoff events', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationStartRequest = {
+        agentId: MOCK_AGENT_ID,
+        inputs: 'Test message'
+      };
+      
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.toolExecutionStarted,
+        mockSSEEvents.toolExecutionDone,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.agentHandoff,
+        mockSSEEvents.messageDelta2,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Act
+      const stream = await service.startStream(request);
+      const events: StreamEvent[] = [];
+      
+      // Collect all events from the stream
+      for await (const event of stream) {
+        events.push(event);
+      }
+      
+      // Assert
+      // Verify handoff event was received
+      expect(events.length).toBe(7);
+      
+      // Check handoff event
+      const handoffEvent = events.find(e => e.type === StreamEventType.AGENT_HANDOFF_STARTED);
+      expect(handoffEvent).toBeDefined();
+      expect(handoffEvent?.data.agent_id).toBe('agent_987654321');
+      expect(handoffEvent?.data.agent_name).toBe('Websearch Agent');
+    });
+    
+    it('should handle unknown event types', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationStartRequest = {
+        agentId: MOCK_AGENT_ID,
+        inputs: 'Test message'
+      };
+      
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.invalidEvent,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Act
+      const stream = await service.startStream(request);
+      const events: StreamEvent[] = [];
+      
+      // Collect all events from the stream
+      for await (const event of stream) {
+        events.push(event);
+      }
+      
+      // Assert
+      expect(events.length).toBe(4);
+      
+      // Check unknown event
+      const unknownEvent = events.find(e => e.type === StreamEventType.UNKNOWN);
+      expect(unknownEvent).toBeDefined();
+      expect(unknownEvent?.data.some).toBe('data');
+    });
+    
+    it('should handle errors when starting a streaming conversation', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationStartRequest = {
+        agentId: MOCK_AGENT_ID,
+        inputs: 'Test message'
+      };
+      
+      const mockError = new Error('API error');
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: false,
+        error: mockError
+      });
+      
       // Act & Assert
-      await expect(service.appendStream(request)).rejects.toThrow('Not implemented - Phase 3');
+      await expect(service.startStream(request)).rejects.toThrow('API error');
+    });
+    
+    it('should handle missing stream body', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationStartRequest = {
+        agentId: MOCK_AGENT_ID,
+        inputs: 'Test message'
+      };
+      
+      const mockResponse = {
+        ok: true,
+        status: 200
+        // No body property
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Act & Assert
+      await expect(service.startStream(request)).rejects.toThrow('Stream body missing from response');
+    });
+  });
+  
+  describe('callback-based streaming methods', () => {
+    it('should call the callback for each event in startStreamWithCallback', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationStartRequest = {
+        agentId: MOCK_AGENT_ID,
+        inputs: 'Test message'
+      };
+      
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Mock callback
+      const mockCallback = jest.fn();
+      
+      // Act
+      await service.startStreamWithCallback(request, mockCallback);
+      
+      // Assert
+      expect(mockCallback).toHaveBeenCalledTimes(3);
+      expect(mockCallback).toHaveBeenCalledWith(expect.objectContaining({
+        type: StreamEventType.CONVERSATION_RESPONSE_STARTED
+      }));
+      expect(mockCallback).toHaveBeenCalledWith(expect.objectContaining({
+        type: StreamEventType.MESSAGE_OUTPUT_DELTA
+      }));
+      expect(mockCallback).toHaveBeenCalledWith(expect.objectContaining({
+        type: StreamEventType.CONVERSATION_RESPONSE_DONE
+      }));
+    });
+    
+    it('should call the callback for each event in appendStreamWithCallback', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationAppendRequest = {
+        agentId: MOCK_AGENT_ID,
+        conversationId: MOCK_CONVERSATION_ID,
+        inputs: 'Follow-up message'
+      };
+      
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Mock callback
+      const mockCallback = jest.fn();
+      
+      // Act
+      await service.appendStreamWithCallback(request, mockCallback);
+      
+      // Assert
+      expect(mockCallback).toHaveBeenCalledTimes(3);
+    });
+    
+    it('should call the callback for each event in restartStreamWithCallback', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationRestartRequest = {
+        conversationId: MOCK_CONVERSATION_ID,
+        messageId: MOCK_MESSAGE_ID,
+        inputs: 'Restart message'
+      };
+      
+      const mockStream = createMockReadableStream([
+        mockSSEEvents.conversationStarted,
+        mockSSEEvents.messageDelta1,
+        mockSSEEvents.conversationDone
+      ]);
+      
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        body: mockStream
+      };
+      
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: true,
+        data: mockResponse
+      });
+      
+      // Mock callback
+      const mockCallback = jest.fn();
+      
+      // Act
+      await service.restartStreamWithCallback(request, mockCallback);
+      
+      // Assert
+      expect(mockCallback).toHaveBeenCalledTimes(3);
+    });
+    
+    it('should propagate errors in callback-based streaming methods', async () => {
+      // Arrange
+      const service = new ConversationService(API_KEY, API_BASE_URL);
+      const request: ConversationStartRequest = {
+        agentId: MOCK_AGENT_ID,
+        inputs: 'Test message'
+      };
+      
+      const mockError = new Error('API error');
+      (fetchWithRetry as jest.Mock).mockResolvedValueOnce({
+        success: false,
+        error: mockError
+      });
+      
+      // Mock callback
+      const mockCallback = jest.fn();
+      
+      // Act & Assert
+      await expect(service.startStreamWithCallback(request, mockCallback)).rejects.toThrow('API error');
+      expect(mockCallback).not.toHaveBeenCalled();
     });
   });
   
@@ -440,7 +938,7 @@ describe('ConversationService', () => {
       
       // Assert
       expect(result.success).toBe(false);
-      expect(result.error.message).toBe('Conversation retrieval not supported with current API - Will be implemented in Phase 3');
+      expect(result.error.message).toBe('Not implemented - Phase 3');
     });
     
     it('listConversations should return not implemented error', async () => {
@@ -452,7 +950,7 @@ describe('ConversationService', () => {
       
       // Assert
       expect(result.success).toBe(false);
-      expect(result.error.message).toBe('Conversation listing not supported with current API - Will be implemented in Phase 3');
+      expect(result.error.message).toBe('Not implemented - Phase 3');
     });
     
     it('deleteConversation should return not implemented error', async () => {
@@ -464,7 +962,7 @@ describe('ConversationService', () => {
       
       // Assert
       expect(result.success).toBe(false);
-      expect(result.error.message).toBe('Conversation deletion not supported with current API - Will be implemented in Phase 3');
+      expect(result.error.message).toBe('Not implemented - Phase 3');
     });
     
     it('submitFunctionResult should return not implemented error', async () => {
@@ -480,7 +978,7 @@ describe('ConversationService', () => {
       
       // Assert
       expect(result.success).toBe(false);
-      expect(result.error.message).toBe('Function submission not supported with current API - Will be implemented in Phase 3');
+      expect(result.error.message).toBe('Not implemented - Phase 3');
     });
   });
 });
