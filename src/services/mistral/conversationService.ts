@@ -17,7 +17,7 @@ import {
   StreamEvent,
   StreamEventType,
   MessageSource
-} from '@types';
+} from '@types/index';
 
 /**
  * Base options for conversation operations
@@ -81,48 +81,43 @@ export class ConversationService {
    * 
    * @returns Headers object with Authorization and Content-Type
    */
-  private getHeaders(isStreaming: boolean = false): HeadersInit {
+  private getHeaders(): HeadersInit {
     return {
       'Authorization': `Bearer ${this.apiKey}`,
       'Content-Type': 'application/json',
-      'Accept': isStreaming ? 'text/event-stream' : 'application/json',
+      'Accept': 'application/json',
       'User-Agent': 'iae-chatbot/1.0 (+https://iae.univ-lyon3.fr)'
     };
   }
 
   /**
-   * Parse the response from an agent completion
+   * Parse the response from the agent completion API
    * 
-   * @param data - Response data from the API
-   * @param stepName - Name of the step that generated the response
-   * @returns Parsed agent completion result
+   * @param data - Raw API response
+   * @returns Processed response with content, sources, and PDF detection
    */
-  private parseAgentResponse(
-    data: any,
-    stepName: string
-  ): {
+  private parseAgentResponse(data: any): {
     content: string;
     sources: MessageSource[];
-    rawApiResponse: any;
     hasPdfUrls: boolean;
-    stepName: string;
+    rawApiResponse: any;
   } {
-    const message = data.choices && data.choices[0] && data.choices[0].message;
-    
+    // Extract message content
+    const message = data.choices?.[0]?.message;
     if (!message) {
-      throw new Error(`Invalid response from ${stepName}`);
+      throw new Error('Invalid response format: missing message content');
     }
 
     let content = message.content || '';
     const sources: MessageSource[] = [];
     let hasPdfUrls = false;
 
-    // Detect PDF URLs in the content
+    // Detect PDF URLs in content
     if (content.includes('.pdf')) {
       hasPdfUrls = true;
     }
 
-    // Process tool_calls if they exist
+    // Process tool calls if they exist
     if (message.tool_calls) {
       message.tool_calls.forEach((toolCall: any) => {
         if (toolCall.function) {
@@ -138,9 +133,8 @@ export class ConversationService {
     return {
       content: content.trim(),
       sources,
-      rawApiResponse: data,
       hasPdfUrls,
-      stepName
+      rawApiResponse: data
     };
   }
 
@@ -156,50 +150,45 @@ export class ConversationService {
     options?: StartConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
     try {
-      // Using the current /agents/completions endpoint
+      // In the current implementation, we're using /agents/completions
+      // This will be migrated to /conversations in Phase 3
       const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/completions`;
       
-      // Format the request based on the current App.js implementation
-      // Use agent_id if provided, otherwise fall back to agentId
       const payload = {
-        agent_id: request.agent_id || request.agentId,
+        agent_id: request.agentId,
         messages: [
           {
-            role: "user",
+            role: 'user',
             content: request.inputs
           }
         ]
       };
-
+      
       const result = await fetchWithRetry<any>(url, {
         method: 'POST',
-        headers: this.getHeaders(options?.stream),
+        headers: this.getHeaders(),
         body: JSON.stringify(payload),
         ...options?.fetchOptions
       });
-
+      
       if (!result.success) {
         return result;
       }
-
-      // Parse the response
-      const stepName = request.stepName || 'Conversation';
-      const parsedResponse = this.parseAgentResponse(result.data, stepName);
       
-      // Return the parsed response as an AgentCompletionResponse
+      const { content, sources, hasPdfUrls, rawApiResponse } = this.parseAgentResponse(result.data);
+      
+      // Format the response to match our AgentCompletionResponse type
       const response: AgentCompletionResponse = {
-        id: result.data.id,
-        object: result.data.object,
-        created_at: result.data.created_at || Date.now(),
-        conversation_id: result.data.id,
-        choices: result.data.choices || [],
-        usage: result.data.usage || {},
-        content: parsedResponse.content,
-        sources: parsedResponse.sources,
-        hasPdfUrls: parsedResponse.hasPdfUrls,
-        rawApiResponse: parsedResponse.rawApiResponse,
-        stepName: parsedResponse.stepName,
-        workflowPath: []
+        id: rawApiResponse.id,
+        object: 'agent.completion',
+        created_at: new Date(rawApiResponse.created || Date.now()).getTime(),
+        conversation_id: rawApiResponse.id,
+        content,
+        sources,
+        hasPdfUrls,
+        rawApiResponse,
+        stepName: 'Conversation',
+        usage: rawApiResponse.usage || {}
       };
       
       return { success: true, data: response };
@@ -223,51 +212,47 @@ export class ConversationService {
     options?: AppendConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
     try {
-      // For the current API, append is the same as start since /agents/completions
-      // doesn't maintain conversation state
+      // In the current implementation, we're using /agents/completions
+      // This will be migrated to /conversations/{conversation_id} in Phase 3
       const url = `${options?.apiBaseUrl || this.apiBaseUrl}/agents/completions`;
       
-      // Format the request based on the current App.js implementation
-      // Use agent_id if provided, otherwise fall back to agentId
+      // For now, we're just sending the new message as a user message
+      // In the future, we'll send the entire conversation history
       const payload = {
         agent_id: request.agentId,
         messages: [
           {
-            role: "user",
+            role: 'user',
             content: request.inputs
           }
         ]
       };
-
+      
       const result = await fetchWithRetry<any>(url, {
         method: 'POST',
-        headers: this.getHeaders(options?.stream),
+        headers: this.getHeaders(),
         body: JSON.stringify(payload),
         ...options?.fetchOptions
       });
-
+      
       if (!result.success) {
         return result;
       }
-
-      // Parse the response
-      const stepName = request.stepName || 'Conversation';
-      const parsedResponse = this.parseAgentResponse(result.data, stepName);
       
-      // Return the parsed response as an AgentCompletionResponse
+      const { content, sources, hasPdfUrls, rawApiResponse } = this.parseAgentResponse(result.data);
+      
+      // Format the response to match our AgentCompletionResponse type
       const response: AgentCompletionResponse = {
-        id: result.data.id,
-        object: result.data.object,
-        created_at: result.data.created_at || Date.now(),
-        conversation_id: request.conversation_id || request.conversationId || result.data.id,
-        choices: result.data.choices || [],
-        usage: result.data.usage || {},
-        content: parsedResponse.content,
-        sources: parsedResponse.sources,
-        hasPdfUrls: parsedResponse.hasPdfUrls,
-        rawApiResponse: parsedResponse.rawApiResponse,
-        stepName: parsedResponse.stepName,
-        workflowPath: []
+        id: rawApiResponse.id,
+        object: 'agent.completion',
+        created_at: new Date(rawApiResponse.created || Date.now()).getTime(),
+        conversation_id: request.conversationId || rawApiResponse.id,
+        content,
+        sources,
+        hasPdfUrls,
+        rawApiResponse,
+        stepName: 'Conversation',
+        usage: rawApiResponse.usage || {}
       };
       
       return { success: true, data: response };
@@ -290,13 +275,13 @@ export class ConversationService {
     request: ConversationRestartRequest,
     options?: RestartConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // For the current API, restart is the same as start since /agents/completions
-    // doesn't maintain conversation state
-    return this.start({
-      agent_id: request.agent_id || request.agentId,
-      inputs: request.inputs,
-      stepName: request.stepName
-    }, options);
+    // In the current implementation with /agents/completions,
+    // there's no concept of restarting a conversation from a specific point.
+    // This will be implemented in Phase 3 with the /conversations API.
+    return {
+      success: false,
+      error: new Error('Not implemented - Phase 3')
+    };
   }
 
   /**
@@ -416,11 +401,11 @@ export class ConversationService {
     result: any,
     options?: AppendConversationOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // Not supported in the current /agents/completions API
-    // Will be implemented in Phase 3 with the /v1/conversations API
+    // Function result submission is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Function submission not supported with current API - Will be implemented in Phase 3')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
@@ -435,11 +420,11 @@ export class ConversationService {
     conversationId: string,
     options?: ConversationBaseOptions
   ): Promise<Result<AgentCompletionResponse, Error>> {
-    // Not supported in the current /agents/completions API
-    // Will be implemented in Phase 3 with the /v1/conversations API
+    // Conversation retrieval is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Conversation retrieval not supported with current API - Will be implemented in Phase 3')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
@@ -452,11 +437,11 @@ export class ConversationService {
   async listConversations(
     options?: ConversationBaseOptions & { limit?: number; offset?: number }
   ): Promise<Result<AgentCompletionResponse[], Error>> {
-    // Not supported in the current /agents/completions API
-    // Will be implemented in Phase 3 with the /v1/conversations API
+    // Conversation listing is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Conversation listing not supported with current API - Will be implemented in Phase 3')
+      error: new Error('Not implemented - Phase 3')
     };
   }
 
@@ -471,139 +456,12 @@ export class ConversationService {
     conversationId: string,
     options?: ConversationBaseOptions
   ): Promise<Result<void, Error>> {
-    // Not supported in the current /agents/completions API
-    // Will be implemented in Phase 3 with the /v1/conversations API
+    // Conversation deletion is not supported in the current /agents/completions API
+    // This will be implemented in Phase 3 with the /conversations API
     return {
       success: false,
-      error: new Error('Conversation deletion not supported with current API - Will be implemented in Phase 3')
+      error: new Error('Not implemented - Phase 3')
     };
-  }
-
-  /**
-   * Execute a complete agent workflow
-   * 
-   * @param userMessage - User message to process
-   * @param agents - Map of agent types to agent IDs
-   * @param updateWorkflowStep - Function to update workflow step status
-   * @param options - Options for executing the workflow
-   * @returns Result containing the workflow result
-   */
-  async executeAgentWorkflow(
-    userMessage: string,
-    agents: {
-      documentLibrary: string;
-      websearch: string;
-      docQA: string;
-    },
-    updateWorkflowStep: (stepId: number, status: 'pending' | 'active' | 'completed') => void,
-    options?: ConversationBaseOptions
-  ): Promise<Result<AgentCompletionResponse, Error>> {
-    try {
-      // Step 1: Document Library
-      updateWorkflowStep(1, 'active');
-      
-      const docLibResult = await this.start({
-        agentId: agents.documentLibrary,
-        inputs: userMessage,
-        stepName: 'Document Library'
-      }, options);
-      
-      if (!docLibResult.success || !docLibResult.data) {
-        throw docLibResult.error || new Error('Failed to get response from Document Library agent');
-      }
-      
-      updateWorkflowStep(1, 'completed');
-      
-      // Check if Document Library found information
-      if (docLibResult.data.content.includes('AUCUNE_INFO_TROUVEE')) {
-        // Step 2: Websearch
-        updateWorkflowStep(2, 'active');
-        
-        const searchQuery = `site:iae.univ-lyon3.fr ${userMessage}`;
-        const websearchResult = await this.start({
-          agentId: agents.websearch,
-          inputs: `Recherche des informations sur "${userMessage}" en utilisant web_search avec la requête: "${searchQuery}"`,
-          stepName: 'Websearch'
-        }, options);
-        
-        if (!websearchResult.success || !websearchResult.data) {
-          throw websearchResult.error || new Error('Failed to get response from Websearch agent');
-        }
-        
-        updateWorkflowStep(2, 'completed');
-        
-        // Check if Websearch found results
-        if (websearchResult.data.content.includes('AUCUN_RESULTAT_WEB')) {
-          // No results found
-          return {
-            success: true,
-            data: {
-              ...websearchResult.data,
-              content: "Désolé, je n'ai trouvé aucune information pertinente dans la base de connaissance de l'IAE ni sur le site officiel. Pourriez-vous reformuler votre question ou être plus précis ?",
-              sources: [],
-              workflowPath: ['Document Library', 'Websearch']
-            }
-          };
-        }
-        
-        // Check if PDFs were found
-        if (websearchResult.data.hasPdfUrls) {
-          // Step 3: Document Q&A for PDF analysis
-          updateWorkflowStep(3, 'active');
-          
-          const docQAResult = await this.start({
-            agentId: agents.docQA,
-            inputs: `Analyse les documents PDF mentionnés pour répondre à la question: "${userMessage}". Contexte des PDFs trouvés: ${websearchResult.data.content}`,
-            stepName: 'Document Q&A'
-          }, options);
-          
-          if (!docQAResult.success || !docQAResult.data) {
-            throw docQAResult.error || new Error('Failed to get response from Document Q&A agent');
-          }
-          
-          updateWorkflowStep(3, 'completed');
-          
-          // Combine results
-          return {
-            success: true,
-            data: {
-              ...docQAResult.data,
-              content: `${websearchResult.data.content}\n\n**Analyse approfondie des documents:**\n${docQAResult.data.content}`,
-              sources: [...(websearchResult.data.sources || []), ...(docQAResult.data.sources || [])],
-              workflowPath: ['Document Library', 'Websearch', 'Document Q&A']
-            }
-          };
-        } else {
-          // No PDFs, return websearch results
-          return {
-            success: true,
-            data: {
-              ...websearchResult.data,
-              workflowPath: ['Document Library', 'Websearch']
-            }
-          };
-        }
-      } else {
-        // Document Library found information, return results
-        return {
-          success: true,
-          data: {
-            ...docLibResult.data,
-            workflowPath: ['Document Library']
-          }
-        };
-      }
-    } catch (error) {
-      // Reset workflow steps
-      updateWorkflowStep(1, 'pending');
-      updateWorkflowStep(2, 'pending');
-      updateWorkflowStep(3, 'pending');
-      
-      return {
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error))
-      };
-    }
   }
 
   /**

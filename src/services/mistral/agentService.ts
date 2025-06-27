@@ -7,7 +7,7 @@
  */
 
 import fetchWithRetry from '@utils/fetchWithRetry';
-import { Agent, AgentConfig, Result, FetchWithRetryOptions } from '@types';
+import { Agent, AgentConfig, Result, FetchWithRetryOptions } from '@types/index';
 
 /**
  * Options for creating an agent
