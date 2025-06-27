@@ -1,0 +1,57 @@
+{
+  "basicInfo": [
+    "Qu'est-ce que l'IAE Lyon 3?",
+    "Où se trouve l'IAE Lyon 3?",
+    "Quels sont les horaires d'ouverture de l'IAE?",
+    "Comment contacter l'administration de l'IAE?"
+  ],
+  "programs": [
+    "Quels sont les masters disponibles à l'IAE Lyon 3?",
+    "Parlez-moi du master en finance",
+    "Quelles sont les spécialités du master en management?",
+    "Y a-t-il des licences professionnelles à l'IAE?",
+    "Quels sont les programmes en alternance proposés?"
+  ],
+  "admissions": [
+    "Quelles sont les conditions d'admission en master?",
+    "Comment s'inscrire à l'IAE Lyon 3?",
+    "Quand commencent les inscriptions pour la prochaine rentrée?",
+    "Faut-il passer un test pour entrer à l'IAE?",
+    "Quels sont les frais de scolarité à l'IAE Lyon 3?"
+  ],
+  "studentLife": [
+    "Comment est la vie étudiante à l'IAE?",
+    "Y a-t-il des associations étudiantes à l'IAE?",
+    "Quelles sont les activités extrascolaires disponibles?",
+    "Est-ce qu'il y a une cafétéria à l'IAE?"
+  ],
+  "international": [
+    "Quels sont les programmes d'échange international?",
+    "Peut-on étudier à l'étranger pendant son cursus à l'IAE?",
+    "Y a-t-il des doubles diplômes internationaux?",
+    "L'IAE accueille-t-il des étudiants étrangers?"
+  ],
+  "research": [
+    "Quels sont les axes de recherche de l'IAE?",
+    "Comment faire un doctorat à l'IAE?",
+    "Quels sont les laboratoires de recherche associés à l'IAE?"
+  ],
+  "careers": [
+    "Quel est le taux d'insertion professionnelle après un master à l'IAE?",
+    "Comment trouver un stage via l'IAE?",
+    "Y a-t-il un service d'aide à l'insertion professionnelle?",
+    "Quels sont les partenariats entreprises de l'IAE?"
+  ],
+  "pdfTriggers": [
+    "Où puis-je trouver la brochure des programmes?",
+    "Je cherche le règlement intérieur de l'IAE",
+    "Avez-vous un guide pour les étudiants internationaux?",
+    "Pouvez-vous me donner le calendrier académique?"
+  ],
+  "edgeCases": [
+    "Quels sont les restaurants près de l'IAE?",
+    "Comment se rendre à l'IAE en transport en commun?",
+    "Est-ce que l'IAE propose des cours de cuisine?",
+    "Quel est le meilleur café près de l'IAE?"
+  ]
+}

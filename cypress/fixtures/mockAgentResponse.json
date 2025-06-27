@@ -1,0 +1,129 @@
+{
+  "id": "conv_01234567890abcdef",
+  "object": "conversation",
+  "created_at": 1719590400,
+  "conversation_id": "conv_01234567890abcdef",
+  "choices": [
+    {
+      "message": {
+        "role": "assistant",
+        "content": "L'IAE Lyon 3 propose plusieurs masters dans différents domaines du management et de la gestion. Voici les principaux programmes de master disponibles :\n\n1. **Master Management et Administration des Entreprises (MAE)**\n   - Formation généraliste en management\n   - Accessible après un diplôme de niveau Bac+4 dans un autre domaine\n\n2. **Master Finance**\n   - Spécialités : Finance d'entreprise, Banque et Finance, Finance de marché\n   - Formation reconnue par les professionnels du secteur\n\n3. **Master Marketing et Vente**\n   - Spécialités : Marketing digital, Marketing et communication, Business development\n   - Partenariats avec de nombreuses entreprises\n\n4. **Master Management des Ressources Humaines**\n   - Formation complète aux métiers RH\n   - Possibilité d'alternance\n\n5. **Master Management International**\n   - Cursus en anglais\n   - Échanges internationaux avec des universités partenaires\n\n6. **Master Comptabilité, Contrôle, Audit (CCA)**\n   - Préparation aux métiers de l'expertise comptable\n   - Dispenses pour les examens du DSCG\n\nPour plus d'informations sur ces programmes, vous pouvez consulter le site officiel de l'IAE Lyon 3 et les brochures détaillées disponibles en ligne.",
+        "tool_calls": [
+          {
+            "id": "call_01234567890abcdef",
+            "type": "document_library",
+            "function": {
+              "name": "document_library.search",
+              "arguments": "{\"query\":\"masters IAE Lyon 3\"}"
+            }
+          },
+          {
+            "id": "call_abcdef01234567890",
+            "type": "web_search",
+            "function": {
+              "name": "web_search",
+              "arguments": "{\"query\":\"site:iae.univ-lyon3.fr masters programmes\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "stop",
+      "index": 0
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 325,
+    "total_tokens": 367,
+    "connector_tokens": 150,
+    "connectors": {
+      "document_library": 75,
+      "web_search": 75
+    }
+  },
+  "outputs": [
+    {
+      "type": "tool.execution",
+      "object": "tool.execution",
+      "id": "exec_01234567890abcdef",
+      "name": "document_library.search",
+      "created_at": 1719590380,
+      "completed_at": 1719590385,
+      "output_index": 0,
+      "status": "completed",
+      "inputs": {
+        "query": "masters IAE Lyon 3"
+      },
+      "outputs": {
+        "documents": [
+          {
+            "id": "doc_01234567890abcdef",
+            "title": "Catalogue des formations IAE Lyon 3",
+            "text": "L'IAE Lyon 3 propose plusieurs masters spécialisés : Management et Administration des Entreprises, Finance, Marketing et Vente, Management des Ressources Humaines, Management International, et Comptabilité Contrôle Audit.",
+            "source": "https://iae.univ-lyon3.fr/formations/masters"
+          }
+        ]
+      }
+    },
+    {
+      "type": "message.output",
+      "object": "message.output",
+      "id": "msg_01234567890abcdef",
+      "agent_id": "agent_01234567890abcdef",
+      "model": "mistral-medium-latest",
+      "role": "assistant",
+      "created_at": 1719590390,
+      "completed_at": 1719590400,
+      "output_index": 1,
+      "status": "completed",
+      "content": [
+        {
+          "type": "text",
+          "text": "L'IAE Lyon 3 propose plusieurs masters dans différents domaines du management et de la gestion. Voici les principaux programmes de master disponibles :"
+        },
+        {
+          "type": "text",
+          "text": "\n\n1. **Master Management et Administration des Entreprises (MAE)**\n   - Formation généraliste en management\n   - Accessible après un diplôme de niveau Bac+4 dans un autre domaine"
+        },
+        {
+          "type": "text",
+          "text": "\n\n2. **Master Finance**\n   - Spécialités : Finance d'entreprise, Banque et Finance, Finance de marché\n   - Formation reconnue par les professionnels du secteur"
+        },
+        {
+          "type": "text",
+          "text": "\n\n3. **Master Marketing et Vente**\n   - Spécialités : Marketing digital, Marketing et communication, Business development\n   - Partenariats avec de nombreuses entreprises"
+        },
+        {
+          "type": "text",
+          "text": "\n\n4. **Master Management des Ressources Humaines**\n   - Formation complète aux métiers RH\n   - Possibilité d'alternance"
+        },
+        {
+          "type": "text",
+          "text": "\n\n5. **Master Management International**\n   - Cursus en anglais\n   - Échanges internationaux avec des universités partenaires"
+        },
+        {
+          "type": "text",
+          "text": "\n\n6. **Master Comptabilité, Contrôle, Audit (CCA)**\n   - Préparation aux métiers de l'expertise comptable\n   - Dispenses pour les examens du DSCG"
+        },
+        {
+          "type": "text",
+          "text": "\n\nPour plus d'informations sur ces programmes, vous pouvez consulter le site officiel de l'IAE Lyon 3 et les brochures détaillées disponibles en ligne."
+        },
+        {
+          "type": "tool_reference",
+          "tool": "document_library",
+          "title": "Catalogue des formations IAE Lyon 3",
+          "url": "https://iae.univ-lyon3.fr/formations/masters",
+          "source": "document_library"
+        },
+        {
+          "type": "tool_reference",
+          "tool": "web_search",
+          "title": "Masters - IAE Lyon 3",
+          "url": "https://iae.univ-lyon3.fr/masters",
+          "source": "web_search"
+        }
+      ]
+    }
+  ]
+}
