@@ -1,82 +1,32 @@
-# 📖 Documentation Index – IAE Chatbot Refactor
+# 📚 Project Documentation Index
 
-Welcome!  
-This index is the **starting point** for any human developer **or coding agent** working on the multi-agent refactor of the IAE Lyon 3 chatbot.
+Welcome to the **IAE Chatbot – Mistral AI** documentation hub.  
+This index gives you a bird’s-eye view of every document that lives in `Docs_project/`, why it exists, and when you should consult it.
 
----
+| Category | File | Purpose / When to Read |
+|----------|------|------------------------|
+| **Vision & Strategy** | [vision.md](vision.md) | High-level product vision, user value, multi-agent concept and key UX pillars. Start here for context. |
+| **Product Requirements** | [REFACTORING_PRD.md](REFACTORING_PRD.md) | Formal Product Requirements Document for the refactor. Defines goals, scope, milestones, success metrics and risks. |
+| **Step-by-Step Guide** | [STEP_BY_STEP_REFACTORING_GUIDE.md](STEP_BY_STEP_REFACTORING_GUIDE.md) | Hands-on checklist that maps each PRD phase to concrete engineering tasks, code snippets and before/after comparisons. Follow this during development. |
+| **Architecture Decisions** | [ARCHITECTURE_DECISION_RECORDS.md](ARCHITECTURE_DECISION_RECORDS.md) | Chronological ADRs capturing key choices (state management, API flow, streaming strategy). Review to understand *why* certain patterns were adopted. |
+| **Technical Requirements** | [TECHNICAL_REQUIREMENTS.md](TECHNICAL_REQUIREMENTS.md) | Canonical engineering standards: languages, tooling, testing thresholds, performance & accessibility budgets. Use as acceptance criteria for PRs. |
+| **API Specification** | [API_INTEGRATION_SPEC.md](API_INTEGRATION_SPEC.md) | Single source of truth for every HTTP call, headers, error handling matrix and SSE event list. Mandatory reading for anyone touching the Mistral API layer. |
+| **(You Are Here)** | DOCUMENTATION_INDEX.md | The map of the docs. Keep up-to-date when new files are added. |
 
-## 1 — Document Catalogue
+## How to Navigate
 
-| # | File | Purpose |
-|---|------|---------|
-| 1 | **vision.md** | Original product vision – why the chatbot exists and the high-level multi-agent workflow it must fulfil. |
-| 2 | **REFACTORING_PRD.md** | Product Requirements Document – scope, goals, target architecture, phases, risks & acceptance criteria for the refactor. |
-| 3 | **STEP_BY_STEP_REFACTORING_GUIDE.md** | Concrete migration checklist (10 phases) with before/after code snippets and branch strategy. |
-| 4 | **ARCHITECTURE_DECISION_RECORDS.md** | Series of ADRs capturing *why* each major technical decision (handoffs vs manual workflow, TypeScript, Zustand, streaming…). |
-| 5 | **API_INTEGRATION_SPEC.md** | End-to-end specification for every call to the Mistral AI Agents API, including payloads, SSE events, error handling & rate limits. |
-| 6 | **TECHNICAL_REQUIREMENTS.md** | Coding standards, folder structure, testing matrix, performance budgets, accessibility and security guidelines. |
+1. **New contributor?**  
+   Read **vision.md** ➜ **REFACTORING_PRD.md** to understand the why & what.
 
----
+2. **Implementing a phase?**  
+   Open **STEP_BY_STEP_REFACTORING_GUIDE.md** and follow the checklist.
 
-## 2 — Recommended Reading Order
+3. **Changing architecture or libraries?**  
+   Propose an update in **ARCHITECTURE_DECISION_RECORDS.md**.
 
-1. **vision.md**  
-   Understand the business context and the desired multi-agent workflow (Document-Library → Websearch → Document-Q&A).
-
-2. **REFACTORING_PRD.md**  
-   Grasp *what* must be built and *how success is measured*. This drives all later engineering tasks.
-
-3. **ARCHITECTURE_DECISION_RECORDS.md**  
-   Learn the rationale behind key choices (handoffs, conversations API, streaming, state store). Prevents re-litigating settled questions.
-
-4. **STEP_BY_STEP_REFACTORING_GUIDE.md**  
-   Follow the migration path phase-by-phase; each step references the PRD sections and ADR numbers it satisfies.
-
-5. **API_INTEGRATION_SPEC.md**  
-   While coding services / workflow, consult this spec for correct endpoints, headers, SSE event parsing and retry strategy.
-
-6. **TECHNICAL_REQUIREMENTS.md**  
-   Adhere to lint rules, testing coverage, performance & security constraints before opening a PR.
+4. **Working on API or services layer?**  
+   Conform strictly to **API_INTEGRATION_SPEC.md** and cross-check with **TECHNICAL_REQUIREMENTS.md**.
 
 ---
 
-## 3 — How the Documents Work Together
-
-```
-vision → PRD ─┐
-              ├─> implementation phases (guide) → code
-ADRs ─────────┘              ↑
-     \                       |
-      \__ informs API Spec __┘
-                 ↓
-        Tech Requirements (quality gate)
-```
-
-* **vision.md** sets the *why*.  
-* **REFACTORING_PRD.md** translates vision into actionable goals and architecture.  
-* **ARCHITECTURE_DECISION_RECORDS.md** records *why* each technical path was chosen, ensuring future decisions remain consistent.  
-* **STEP_BY_STEP_REFACTORING_GUIDE.md** operationalises the PRD + ADRs into a linear execution plan.  
-* **API_INTEGRATION_SPEC.md** provides the low-level contract required by the services written in each phase.  
-* **TECHNICAL_REQUIREMENTS.md** defines the “Definition of Done” and CI gates for every pull request.
-
-Together they form a complete knowledge stack: **strategy → decisions → execution plan → API contract → quality bar**.
-
----
-
-## 4 — Index Usage for Coding Agents
-
-When issuing prompts to an autonomous coding agent:
-
-1. **Reference specific filenames** so the agent loads them as context.  
-2. **Cite the relevant section / phase** in the PRD or Guide to anchor the task.  
-3. Provide acceptance criteria from **TECHNICAL_REQUIREMENTS.md**.  
-4. For service-layer tasks, attach the corresponding excerpt from **API_INTEGRATION_SPEC.md**.  
-5. If the task alters architecture, instruct the agent to consult / update **ARCHITECTURE_DECISION_RECORDS.md**.
-
-Example prompt snippet:
-
-> “Implement Phase 2 (Services Layer) as described in STEP_BY_STEP_REFACTORING_GUIDE.md §2, ensuring all calls match API_INTEGRATION_SPEC.md §4, and code style passes TECHNICAL_REQUIREMENTS.md ‘ESLint rules’.”
-
----
-
-Happy building! 🚀
+_💡 Tip: keep this index bookmarked in your IDE for quick access to any project doc._  
